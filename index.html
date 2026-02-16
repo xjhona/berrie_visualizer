@@ -5,19 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Planificador de Cultivo de Arándanos</title>
     
-    <!-- 1. Cargamos React y ReactDOM desde Internet (CDN) -->
+    <!-- Librerías necesarias -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    
-    <!-- 2. Cargamos Babel para que entienda el código moderno en el navegador -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- 3. Cargamos Tailwind CSS para el diseño -->
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
-        /* Ajustes para rangos en navegadores */
         input[type=range] { -webkit-appearance: none; background: transparent; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #7c3aed; cursor: pointer; margin-top: -6px; }
         input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #e2e8f0; border-radius: 2px; }
@@ -29,7 +24,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
-        // --- ICONOS SVG (Reemplazo de lucide-react para no usar dependencias externas) ---
+        // --- ICONOS SVG ---
         const Icon = ({ children, className }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
                 {children}
@@ -64,15 +59,20 @@
 
             // Cálculos
             const stats = useMemo(() => {
-                const espaciosEntreHileras = params.hilerasPorBloque - 1;
-                const anchoTotalBloque = (params.distHileras * espaciosEntreHileras) + params.anchoCalle;
-                const distPromedioHileras = anchoTotalBloque / params.hilerasPorBloque;
+                // Protección contra división por cero en cálculos estadísticos
+                const hilerasBloque = Math.max(1, params.hilerasPorBloque);
+                const dHileras = Math.max(0.1, params.distHileras);
+                const dPlantas = Math.max(0.1, params.distPlantas);
+
+                const espaciosEntreHileras = hilerasBloque - 1;
+                const anchoTotalBloque = (dHileras * espaciosEntreHileras) + params.anchoCalle;
+                const distPromedioHileras = anchoTotalBloque / hilerasBloque;
                 
-                const areaPorPlanta = distPromedioHileras * params.distPlantas;
+                const areaPorPlanta = distPromedioHileras * dPlantas;
                 const plantasPorHa = areaPorPlanta > 0 ? Math.floor(10000 / areaPorPlanta) : 0;
                 const totalPlantas = Math.floor(plantasPorHa * params.areaTotal);
                 
-                const densidadIdeal = 10000 / (params.distHileras * params.distPlantas);
+                const densidadIdeal = 10000 / (dHileras * dPlantas);
                 const eficiencia = densidadIdeal > 0 ? (plantasPorHa / densidadIdeal) * 100 : 0;
 
                 return {
@@ -85,7 +85,9 @@
 
             const handleChange = (e) => {
                 const { name, value } = e.target;
-                setParams(prev => ({ ...prev, [name]: parseFloat(value) || 0 }));
+                // Permitimos el valor "vacío" o 0 durante la edición, pero en el estado guardamos 0
+                // La protección real estará en el dibujado (draw)
+                setParams(prev => ({ ...prev, [name]: value === '' ? 0 : parseFloat(value) }));
             };
 
             const handleZoom = (delta) => {
@@ -119,6 +121,16 @@
                 gradient.addColorStop(1, '#ffffff');
                 ctx.fillStyle = gradient;
                 ctx.fillRect(0, 0, width, height);
+
+                // --- PROTECCIÓN CRÍTICA ---
+                // Si los valores son muy pequeños o cero (mientras el usuario edita), NO intentamos dibujar el bucle.
+                if (params.distPlantas < 0.1 || params.distHileras < 0.1) {
+                    ctx.fillStyle = "#94a3b8";
+                    ctx.font = "14px sans-serif";
+                    ctx.fillText("Ingrese valores válidos...", 20, 30);
+                    return; 
+                }
+                // -------------------------
 
                 // Isométrico
                 const isoX = (x, y) => (x - y) * Math.cos(Math.PI / 6);
@@ -322,15 +334,15 @@
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-slate-700 flex justify-between">Entre Plantas (m)</label>
                                         <div className="flex gap-2">
-                                            <input type="number" name="distPlantas" min="0.10" max="3.00" step="0.01" value={params.distPlantas} onChange={handleChange} className="w-20 p-1 border border-slate-300 rounded text-center font-bold text-purple-700 focus:ring-2 focus:ring-purple-500 outline-none" />
-                                            <input type="range" name="distPlantas" min="0.2" max="2.0" step="0.01" value={params.distPlantas} onChange={handleChange} className="flex-1 h-8 bg-slate-200 rounded-lg accent-purple-600 align-middle" />
+                                            <input type="number" name="distPlantas" min="0.10" max="3.00" step="0.01" value={params.distPlantas === 0 ? '' : params.distPlantas} onChange={handleChange} className="w-20 p-1 border border-slate-300 rounded text-center font-bold text-purple-700 focus:ring-2 focus:ring-purple-500 outline-none" />
+                                            <input type="range" name="distPlantas" min="0.2" max="2.0" step="0.01" value={params.distPlantas || 0.75} onChange={handleChange} className="flex-1 h-8 bg-slate-200 rounded-lg accent-purple-600 align-middle" />
                                         </div>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-slate-700 flex justify-between">Entre Hileras (m)</label>
                                         <div className="flex gap-2">
-                                            <input type="number" name="distHileras" min="0.50" max="5.00" step="0.01" value={params.distHileras} onChange={handleChange} className="w-20 p-1 border border-slate-300 rounded text-center font-bold text-purple-700 focus:ring-2 focus:ring-purple-500 outline-none" />
-                                            <input type="range" name="distHileras" min="1.0" max="4.0" step="0.01" value={params.distHileras} onChange={handleChange} className="flex-1 h-8 bg-slate-200 rounded-lg accent-purple-600" />
+                                            <input type="number" name="distHileras" min="0.50" max="5.00" step="0.01" value={params.distHileras === 0 ? '' : params.distHileras} onChange={handleChange} className="w-20 p-1 border border-slate-300 rounded text-center font-bold text-purple-700 focus:ring-2 focus:ring-purple-500 outline-none" />
+                                            <input type="range" name="distHileras" min="1.0" max="4.0" step="0.01" value={params.distHileras || 2.20} onChange={handleChange} className="flex-1 h-8 bg-slate-200 rounded-lg accent-purple-600" />
                                         </div>
                                     </div>
                                 </div>
@@ -342,14 +354,14 @@
                                             <label className="text-xs font-medium text-slate-600">Cortina (m)</label>
                                             <div className="flex items-center border rounded px-2 bg-slate-50">
                                                 <WindIcon className="text-slate-400 mr-2" />
-                                                <input type="number" name="distCortina" step="0.01" value={params.distCortina} onChange={handleChange} className="w-full py-1 bg-transparent outline-none text-sm" />
+                                                <input type="number" name="distCortina" step="0.01" value={params.distCortina === 0 ? '' : params.distCortina} onChange={handleChange} className="w-full py-1 bg-transparent outline-none text-sm" />
                                             </div>
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-xs font-medium text-slate-600">Ancho Calle (m)</label>
                                             <div className="flex items-center border rounded px-2 bg-slate-50">
                                                 <LayoutIcon className="text-slate-400 mr-2" />
-                                                <input type="number" name="anchoCalle" step="0.01" value={params.anchoCalle} onChange={handleChange} className="w-full py-1 bg-transparent outline-none text-sm" />
+                                                <input type="number" name="anchoCalle" step="0.01" value={params.anchoCalle === 0 ? '' : params.anchoCalle} onChange={handleChange} className="w-full py-1 bg-transparent outline-none text-sm" />
                                             </div>
                                         </div>
                                     </div>
@@ -370,7 +382,7 @@
                                     </div>
                                 </div>
                                 <div className="bg-blue-50 p-3 rounded text-xs text-blue-800 border border-blue-200">
-                                    <p><strong>Cálculo:</strong> Se usa el distanciamiento promedio: <em>(({params.distHileras} * {params.hilerasPorBloque - 1}) + {params.anchoCalle}) / {params.hilerasPorBloque} = {stats.distPromedioHileras}m</em></p>
+                                    <p><strong>Cálculo:</strong> Se usa el distanciamiento promedio: <em>(({params.distHileras || 0} * {params.hilerasPorBloque - 1}) + {params.anchoCalle || 0}) / {params.hilerasPorBloque} = {stats.distPromedioHileras}m</em></p>
                                 </div>
                             </div>
                         </div>
