@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Planificador de Cultivo de Arándanos</title>
     
-    <!-- Librerías necesarias -->
+    <!-- Librerías necesarias (React, Babel, Tailwind) -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -56,10 +56,10 @@
             const [zoom, setZoom] = useState(35);
             const canvasRef = useRef(null);
             const containerRef = useRef(null);
+            const appRef = useRef(null);
 
             // Cálculos
             const stats = useMemo(() => {
-                // Protección contra división por cero en cálculos estadísticos
                 const hilerasBloque = Math.max(1, params.hilerasPorBloque);
                 const dHileras = Math.max(0.1, params.distHileras);
                 const dPlantas = Math.max(0.1, params.distPlantas);
@@ -72,21 +72,15 @@
                 const plantasPorHa = areaPorPlanta > 0 ? Math.floor(10000 / areaPorPlanta) : 0;
                 const totalPlantas = Math.floor(plantasPorHa * params.areaTotal);
                 
-                const densidadIdeal = 10000 / (dHileras * dPlantas);
-                const eficiencia = densidadIdeal > 0 ? (plantasPorHa / densidadIdeal) * 100 : 0;
-
                 return {
                     plantasPorHa,
                     totalPlantas,
-                    distPromedioHileras: distPromedioHileras.toFixed(2),
-                    eficiencia: eficiencia.toFixed(1)
+                    distPromedioHileras: distPromedioHileras.toFixed(2)
                 };
             }, [params]);
 
             const handleChange = (e) => {
                 const { name, value } = e.target;
-                // Permitimos el valor "vacío" o 0 durante la edición, pero en el estado guardamos 0
-                // La protección real estará en el dibujado (draw)
                 setParams(prev => ({ ...prev, [name]: value === '' ? 0 : parseFloat(value) }));
             };
 
@@ -123,14 +117,12 @@
                 ctx.fillRect(0, 0, width, height);
 
                 // --- PROTECCIÓN CRÍTICA ---
-                // Si los valores son muy pequeños o cero (mientras el usuario edita), NO intentamos dibujar el bucle.
                 if (params.distPlantas < 0.1 || params.distHileras < 0.1) {
                     ctx.fillStyle = "#94a3b8";
                     ctx.font = "14px sans-serif";
                     ctx.fillText("Ingrese valores válidos...", 20, 30);
                     return; 
                 }
-                // -------------------------
 
                 // Isométrico
                 const isoX = (x, y) => (x - y) * Math.cos(Math.PI / 6);
@@ -287,9 +279,9 @@
             }, []);
 
             return (
-                <div className="flex flex-col h-full bg-slate-50 text-slate-800">
+                <div ref={appRef} className="flex flex-col h-full bg-slate-50 text-slate-800">
                     {/* Header Resumen */}
-                    <div className="bg-white p-4 shadow-sm border-b border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4 flex-shrink-0">
+                    <div className="bg-white p-4 shadow-sm border-b border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4 flex-shrink-0">
                         <div className="flex items-center space-x-3 p-3 bg-purple-50 rounded-lg border border-purple-100">
                             <div className="bg-purple-600 text-white p-2 rounded-full"><SproutIcon /></div>
                             <div>
@@ -304,18 +296,13 @@
                                 <p className="text-xl md:text-2xl font-bold text-green-900">{stats.plantasPorHa.toLocaleString()}</p>
                             </div>
                         </div>
-                        <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                            <div className="bg-blue-600 text-white p-2 rounded-full"><MaximizeIcon /></div>
-                            <div>
-                                <p className="text-xs text-blue-800 font-semibold uppercase">Ancho Promedio</p>
-                                <p className="text-xl md:text-2xl font-bold text-blue-900">{stats.distPromedioHileras}m</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center space-x-3 p-3 bg-orange-50 rounded-lg border border-orange-100">
-                            <div className="bg-orange-600 text-white p-2 rounded-full"><LayoutIcon /></div>
-                            <div>
-                                <p className="text-xs text-orange-800 font-semibold uppercase">Eficiencia</p>
-                                <p className="text-xl md:text-2xl font-bold text-orange-900">{stats.eficiencia}%</p>
+                        <div className="flex items-center p-3 bg-blue-50 rounded-lg border border-blue-100">
+                            <div className="flex items-center space-x-3">
+                                <div className="bg-blue-600 text-white p-2 rounded-full"><MaximizeIcon /></div>
+                                <div>
+                                    <p className="text-xs text-blue-800 font-semibold uppercase">Ancho Promedio</p>
+                                    <p className="text-xl md:text-2xl font-bold text-blue-900">{stats.distPromedioHileras}m</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -384,6 +371,10 @@
                                 <div className="bg-blue-50 p-3 rounded text-xs text-blue-800 border border-blue-200">
                                     <p><strong>Cálculo:</strong> Se usa el distanciamiento promedio: <em>(({params.distHileras || 0} * {params.hilerasPorBloque - 1}) + {params.anchoCalle || 0}) / {params.hilerasPorBloque} = {stats.distPromedioHileras}m</em></p>
                                 </div>
+                                {/* Footer Credits */}
+                                <div className="mt-4 text-center">
+                                    <span className="text-[10px] text-slate-400 font-mono">Vibe-coded by jchilet</span>
+                                </div>
                             </div>
                         </div>
 
@@ -400,7 +391,9 @@
                                     <ZoomOutIcon />
                                 </button>
                             </div>
+                            
                             <canvas ref={canvasRef} className="block shadow-md bg-white" style={{ maxWidth: '100%', maxHeight: '100%' }} />
+
                             <div className="absolute bottom-6 right-6 bg-white/90 backdrop-blur p-3 rounded-lg shadow-lg border border-slate-200 text-xs space-y-2 pointer-events-none z-10">
                                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#1B5E20]"></div><span>Arándano en Maceta</span></div>
                                 <div className="flex items-center gap-2"><div className="w-3 h-3 bg-[#607D8B] border border-black"></div><span>Malla Cortaviento</span></div>
